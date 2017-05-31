@@ -38,8 +38,7 @@ public class Message{
     }
 
     public String toString(){
-        String result = signature + message;
-        return result;
+        return signature + message;
     }
 
     public KeyPair Generate() throws Exception{

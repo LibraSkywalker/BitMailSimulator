@@ -17,11 +17,12 @@ public class User {
     Map<Integer,PublicKey> publicKeyList = new HashMap<>();
     Set<User> neighbours = new HashSet<>();
     Integer ID;
-    public int mailSent = 0,mailReceived = 0;
-    PrivateKey privateKey,systemKey;
+    public int mailSent = 0, mailBack = 0 , mailReceived = 0, mailForward = 0, mailBlock = 0;
+    PrivateKey oldPrivateKey,privateKey,systemKey;
     LinkedList<Message> mailList = new LinkedList<>();
     Set<Message> recieved = new HashSet<>();
     LinkedList<Integer> recentForward = new LinkedList<>();
+
     public User(){
         ID = Const.PowerUser;
         KeyPair keys = EncryptionUtil.generate();
@@ -40,12 +41,13 @@ public class User {
 
     private LinkedList<Mail> mailBox = new LinkedList<>();
 
-    public User(int ID,PrivateKey systemKey) throws Exception{
+    public User(int ID,PrivateKey systemKey, PublicKey publicKey) throws Exception{
         this.ID = ID;
         this.systemKey = systemKey;
         KeyPair keys = EncryptionUtil.generate();
-        privateKey = keys.getPrivate();
+        oldPrivateKey = privateKey = keys.getPrivate();
         publicKeyList.put(ID,keys.getPublic());
+        publicKeyList.put(Const.PowerUser,publicKey);
         keyStack.add(ID);
     }
 
@@ -58,9 +60,8 @@ public class User {
         readMail();
         if (Math.random() < 0.2){
             sendMessage();
-            mailSent++;
         }
-        if (Math.random() < 0.1){
+        if (Math.random() < 0.01){
             requestUpdate();
         }
     }
@@ -74,6 +75,14 @@ public class User {
         for (User user : neighbours) {
             user.recive(message);
         }
+    }
+
+    public void printInfo(){
+        System.out.println("MailSented:" + mailSent);
+        System.out.println("MailReceived:" + mailReceived);
+        System.out.println("MailBack:" + mailBack);
+        System.out.println("MailForward:" + mailForward);
+        System.out.println("MailBlock:" + mailBlock);
     }
 
     void recive(Message message){
@@ -90,14 +99,24 @@ public class User {
     }
 
     void sendMessage() throws Exception{
+        mailSent++;
         Random random = new Random();
         Integer number = random.nextInt();
         Integer target = random.nextInt(Const.UserNumber);
+        if (target == ID) return;
         String content="send:" + number.toString();
         sendTo(target,content);
         sended.put(number,target);
     }
 
+    void sendMessage(Integer target) throws Exception{
+        mailSent++;
+        Random random = new Random();
+        Integer number = random.nextInt();
+        String content="send:" + number.toString();
+        sendTo(target,content);
+        sended.put(number,target);
+    }
 
     private LinkedList<Integer> keyStack = new LinkedList<>();
     void synchronize() throws Exception{
@@ -124,6 +143,7 @@ public class User {
                 + Message.PublicKey2String(keys.getPublic());
 
         sendTo(Const.PowerUser,content);
+        oldPrivateKey = privateKey;
         privateKey = keys.getPrivate();
     }
 
@@ -137,8 +157,8 @@ public class User {
     }
 
     boolean verifyReply(int content,int target){
-        if (sended.containsKey(target) && sended.get(target).equals(content)) {
-            sended.remove(target);
+        if (sended.containsKey(content) && sended.get(content).equals(target)) {
+            sended.remove(content);
             return true;
         }
         return false;
@@ -149,12 +169,16 @@ public class User {
         for (Integer ID : recentForward){
             if (ID.equals(userID)) ++count;
         }
+        if (count > Const.maxForward){
+            mailBlock++;
+        }
         return  (count <= Const.maxForward);
     }
 
     void checkList() {
         for (Message message : mailList){
-            if (message.Decrypt(privateKey) || message.Decrypt(systemKey)) {
+            mailForward += mailList.size();
+            if (message.Decrypt(privateKey) || message.Decrypt(systemKey) || message.Decrypt(oldPrivateKey)) {
                 PublicKey publicKey = publicKeyList.get(message.getSender());
                 try {
                     if (message.ValidateCipher(publicKey)) {
@@ -176,10 +200,12 @@ public class User {
                 e.printStackTrace();
             }
         }
+        mailList.clear();
     }
 
     boolean readMail() throws Exception{
         if (!mailBox.isEmpty()){
+            mailReceived += mailBox.size();
             for (Mail mail : mailBox){
                 if (mail.content.startsWith("send:")){
                     String content = mail.content.substring(5);
@@ -188,7 +214,7 @@ public class User {
                     String content = mail.content.substring(6);
                     if (!verifyReply(Integer.parseInt(content),mail.userID)) return false;
                     else {
-                        mailReceived++;
+                        mailBack++;
                     }
                 } else if (mail.content.startsWith("update:")){
                     String content = mail.content.substring(7);
@@ -199,6 +225,7 @@ public class User {
             }
             mailBox.clear();
         }
+
         return true;
     }
 }

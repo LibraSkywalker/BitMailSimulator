@@ -12,14 +12,12 @@ public class Kernel {
 
     public static void main(String[] args) throws Exception{
         Network network = new Network();
-        network.setDenseNetwork(Const.UserNumber);
-        File file=new File("result.txt");
-        BufferedWriter bf=new BufferedWriter(new PrintWriter(file));
-        for (int i = 0; i < 20; i++){
-            network.run();
-            System.out.println("MailSented:" + network.getUser(0).mailSent);
-            System.out.println("MailReceived:" + network.getUser(0).mailReceived);
-        }
+        network.setNormalNetwork(Const.UserNumber);
 
+        for (int i = 0; i < 200; i++){
+            System.out.println("Round" + i + ":");
+            network.run();
+            network.getUser(1).printInfo();
+        }
     }
 }

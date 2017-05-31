@@ -121,7 +121,7 @@ public class EncryptionUtil{
             decryptedText = ByteArray2String(cipher.doFinal(String2ByteArray(text)));
 
         } catch (Exception e) {
-            e.printStackTrace();
+            return "";
         }
 
         return decryptedText;
