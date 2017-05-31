@@ -9,7 +9,7 @@ import java.util.Random;
  * Created by Bill on 2017/5/30.
  */
 public class Network {
-    LinkedList<User> userList;
+    LinkedList<User> userList = new LinkedList<>();
     public void setSparseNetwork(int num) throws Exception{
 
     }
@@ -34,12 +34,16 @@ public class Network {
         // sychronzie public keys
         for (int i = 0; i < num + 10; i++){
             for (User user : userList){
-                user.sychronize();
+                user.synchronize();
             }
         }
     }
     public void setNormalNetwork(int num) throws Exception{
 
+    }
+
+    public User getUser(int i){
+        return userList.get(i);
     }
     public int run() throws Exception{
         int flag = Const.Normal;

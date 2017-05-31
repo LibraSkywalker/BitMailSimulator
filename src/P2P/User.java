@@ -17,6 +17,7 @@ public class User {
     Map<Integer,PublicKey> publicKeyList = new HashMap<>();
     Set<User> neighbours = new HashSet<>();
     Integer ID;
+    public int mailSent = 0,mailReceived = 0;
     PrivateKey privateKey,systemKey;
     LinkedList<Message> mailList = new LinkedList<>();
     Set<Message> recieved = new HashSet<>();
@@ -45,6 +46,7 @@ public class User {
         KeyPair keys = EncryptionUtil.generate();
         privateKey = keys.getPrivate();
         publicKeyList.put(ID,keys.getPublic());
+        keyStack.add(ID);
     }
 
     public void addNeighbour(User user){
@@ -56,6 +58,7 @@ public class User {
         readMail();
         if (Math.random() < 0.2){
             sendMessage();
+            mailSent++;
         }
         if (Math.random() < 0.1){
             requestUpdate();
@@ -63,6 +66,7 @@ public class User {
     }
 
     int error(){
+        //TODO
         return Const.Normal;
     }
 
@@ -94,15 +98,18 @@ public class User {
         sended.put(number,target);
     }
 
-    private boolean update_flag = false;
-    void sychronize() throws Exception{
-        if (!update_flag){
-            requestUpdate();
-            update_flag = true;
-        } else {
-            checkList();
-            readMail();
+
+    private LinkedList<Integer> keyStack = new LinkedList<>();
+    void synchronize() throws Exception{
+        for (Integer aim : keyStack){
+            for (User user : neighbours) {
+                if (!user.publicKeyList.containsKey(aim)){
+                    user.publicKeyList.put(aim,publicKeyList.get(aim));
+                    user.keyStack.add(aim);
+                }
+            }
         }
+        keyStack.clear();
     }
 
     void replyMessage(int target,String content) throws Exception{
@@ -145,20 +152,28 @@ public class User {
         return  (count <= Const.maxForward);
     }
 
-    void checkList() throws Exception{
+    void checkList() {
         for (Message message : mailList){
             if (message.Decrypt(privateKey) || message.Decrypt(systemKey)) {
                 PublicKey publicKey = publicKeyList.get(message.getSender());
-                if (message.ValidateCipher(publicKey)) {
-                    mailBox.add(new Mail(message.getContent(), message.getSender()));
+                try {
+                    if (message.ValidateCipher(publicKey)) {
+                        mailBox.add(new Mail(message.getContent(), message.getSender()));
+                    }
+                } catch (Exception e){
+                    e.printStackTrace();
                 }
             }
             PublicKey publicKey = publicKeyList.get(message.getSender());
-            if (message.Validate(publicKey) && permit(message.getSender())){
-                forward(message);
-                recentForward.add(message.getSender());
-                if (recentForward.size() > Const.recentSize)
-                    recentForward.removeFirst();
+            try {
+                if (message.Validate(publicKey) && permit(message.getSender())){
+                    forward(message);
+                    recentForward.add(message.getSender());
+                    if (recentForward.size() > Const.recentSize)
+                        recentForward.removeFirst();
+                }
+            } catch (Exception e){
+                e.printStackTrace();
             }
         }
     }
@@ -172,13 +187,14 @@ public class User {
                 } else if (mail.content.startsWith("reply:")){
                     String content = mail.content.substring(6);
                     if (!verifyReply(Integer.parseInt(content),mail.userID)) return false;
+                    else {
+                        mailReceived++;
+                    }
                 } else if (mail.content.startsWith("update:")){
                     String content = mail.content.substring(7);
                     PublicKey publicKey = Message.String2PublicKey(content);
                     if (mail.userID != Const.PowerUser)
                         publicKeyList.put(mail.userID,publicKey);
-                } else if (mail.content.equals("Sychronize.")){
-                    sendPublicKey(mail.userID);
                 }
             }
             mailBox.clear();
